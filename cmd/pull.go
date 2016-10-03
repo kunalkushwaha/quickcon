@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"archive/tar"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -31,7 +29,7 @@ type createOptions struct {
 // pullCmd represents the pull command
 var pullCmd = &cobra.Command{
 	Use:   "pull [OPTIONS] NAME[:TAG|@DIGEST]",
-	Short: "Pull an image from a registry",
+	Short: "Pull an image from a registry (requires Docker)",
 	Args:  cli.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var opts pullOptions
@@ -140,45 +138,5 @@ func untarCommand(tarball, target string) error {
 	out, errr := cmd.CombinedOutput()
 	fmt.Println(string(out))
 	fmt.Println(errr)
-	return nil
-}
-
-func untar(tarball, target string) error {
-	reader, err := os.Open(tarball)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-	tarReader := tar.NewReader(reader)
-
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			fmt.Println(err)
-			return err
-		}
-
-		path := filepath.Join(target, header.Name)
-		info := header.FileInfo()
-
-		if info.IsDir() {
-			if err = os.MkdirAll(path, info.Mode()); err != nil {
-				return err
-			}
-			continue
-		}
-		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, info.Mode())
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(file, tarReader)
-		if err != nil {
-			return err
-		}
-		file.Close()
-
-	}
 	return nil
 }

@@ -7,14 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/docker/distribution/digest"
-	//"github.com/docker/distribution/manifest"
-	//	"github.com/docker/libtrust"
 	"github.com/heroku/docker-registry-client/registry"
 )
 
@@ -24,7 +21,7 @@ const DockerHub = "https://registry-1.docker.io"
 // importCmd represents the import command
 var importCmd = &cobra.Command{
 	Use:   "import",
-	Short: "Imports container image from remote registery",
+	Short: "Imports container image from remote registery and convert it to runc's rootfs",
 	Run:   importImage,
 }
 
@@ -39,7 +36,8 @@ func init() {
 
 func importImage(cmd *cobra.Command, args []string) {
 	if len(args) < 1 {
-		fmt.Println("Error: image url required!")
+		fmt.Printf("Error: image url required!\n\n")
+		cmd.Help()
 		return
 	}
 	var url string
@@ -114,14 +112,31 @@ func importImage(cmd *cobra.Command, args []string) {
 			return
 		}
 		layerList.PushFront(layer.BlobSum.String())
-		//fmt.Println(layer)
+
+	}
+	tgt := filepath.Join(target, "rootfs")
+	err = os.MkdirAll(tgt, 0777)
+	if err != nil {
+		fmt.Printf("Unable to creare folder :%s \n", tgt)
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	// Extract layers to build rootfs
+	for l := layerList.Front(); l != nil; l = l.Next() {
+		source := filepath.Join(target, l.Value.(string))
+		commandArgs := []string{"-xf", source + ".tar", "-C", tgt}
+		err = exec.Command("tar", commandArgs...).Run()
+		if err != nil {
+			fmt.Printf("Error while extracting source: %s, Err: %v\n", source, err)
+			//os.Exit(1)
+		}
+	}
+	fmt.Printf("rootfs is prepared at : %s \n", tgt)
+	for l := layerList.Front(); l != nil; l = l.Next() {
+		source := filepath.Join(target, l.Value.(string)) + ".tar"
+		os.Remove(source)
 	}
 
-	//TODO: Extract layers to build rootfs
-	for l := layerList.Front(); l != nil; l = l.Next() {
-		command := exec.Command("/bin/tar", "-xf", filepath.Join(target, reflect.TypeOf(l).String()), "-C", filepath.Join(target, "rootfs"))
-		fmt.Println(command.Output())
-	}
 }
 
 func getRegistrySource(url string) (string, string, error) {
@@ -130,8 +145,4 @@ func getRegistrySource(url string) (string, string, error) {
 		return "", "", fmt.Errorf("Error: invalid url : %s", url)
 	}
 	return source[0], source[1], nil
-}
-
-func buildRootFS() {
-
 }

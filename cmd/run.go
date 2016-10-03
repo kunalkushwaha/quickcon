@@ -43,6 +43,11 @@ func init() {
 func runCommand(cmd *cobra.Command, args []string) {
 
 	opts := runOpts{}
+	if len(args) < 1 {
+		fmt.Println("container-id / Name required")
+		cmd.Help()
+		return
+	}
 	opts.ID = args[0]
 	opts.bundle, _ = cmd.Flags().GetString("bundle")
 	opts.console, _ = cmd.Flags().GetString("console")
