@@ -66,10 +66,18 @@ func importImage(cmd *cobra.Command, args []string) {
 	}
 
 	imageDetails := strings.Split(image, ":")
+	if len(imageDetails) < 2 {
+		imageDetails = append(imageDetails, "latest")
+	}
 
 	manifest, err := hub.Manifest(imageDetails[0], imageDetails[1])
 	if err != nil {
-		fmt.Println("ERR: ", err)
+		if strings.Contains(err.Error(), "status=404") {
+			fmt.Printf("Error: image %s not found\n", imageDetails[0])
+		}
+		if strings.Contains(err.Error(), "status=401") {
+			fmt.Printf("Authentication required for registry\n")
+		}
 		return
 	}
 
