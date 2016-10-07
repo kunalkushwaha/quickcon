@@ -59,9 +59,21 @@ var (
 			Cwd:             "/",
 			NoNewPrivileges: true,
 			Capabilities: []string{
-				"CAP_AUDIT_WRITE",
-				"CAP_KILL",
+				"CAP_NET_RAW",
 				"CAP_NET_BIND_SERVICE",
+				"CAP_AUDIT_READ",
+				"CAP_AUDIT_WRITE",
+				"CAP_DAC_OVERRIDE",
+				"CAP_SETFCAP",
+				"CAP_SETPCAP",
+				"CAP_SETGID",
+				"CAP_SETUID",
+				"CAP_MKNOD",
+				"CAP_CHOWN",
+				"CAP_FOWNER",
+				"CAP_FSETID",
+				"CAP_KILL",
+				"CAP_SYS_CHROOT",
 			},
 			Rlimits: []specs.Rlimit{
 				{
@@ -77,13 +89,13 @@ var (
 				Destination: "/proc",
 				Type:        "proc",
 				Source:      "proc",
-				Options:     nil,
+				Options:     []string{"nosuid", "noexec", "nodev"},
 			},
 			{
 				Destination: "/dev",
 				Type:        "tmpfs",
 				Source:      "tmpfs",
-				Options:     []string{"nosuid", "strictatime", "mode=755", "size=65536k"},
+				Options:     []string{"nosuid", "strictatime", "mode=755"},
 			},
 			{
 				Destination: "/dev/pts",
@@ -123,7 +135,8 @@ var (
 				"/proc/timer_list",
 				"/proc/timer_stats",
 				"/proc/sched_debug",
-				"/sys/firmware",
+				//FIXME: Fails to start the container saying "not a directory"
+				//"/sys/firmware",
 			},
 			ReadonlyPaths: []string{
 				"/proc/asound",
@@ -166,7 +179,7 @@ func init() {
 	RootCmd.AddCommand(specCmd)
 
 	specCmd.Flags().StringP("runas", "", "", "user as which container should run ")
-	specCmd.Flags().StringP("security-profile", "", "docker-default", "Apparmor security profile for container")
+	specCmd.Flags().StringP("security-profile", "", "", "Apparmor security profile for container")
 	//specCmd.Flags().StringP("pre-start", "", "", "pre-start hook script/binary to execute before container start")
 	//specCmd.Flags().StringP("post-start", "", "", "post-start hook script/binary to execute after container start")
 	//specCmd.Flags().StringP("post-stop", "", "", "post-stop hook script/binary to execute after container stops")
@@ -194,8 +207,11 @@ func generateSpec(cmd *cobra.Command, args []string) {
 	spec.Platform.OS = configJSON.Os
 	//Append xterm
 	spec.Process.Env = configJSON.Config.Env
-	spec.Process.Cwd = configJSON.Config.WorkingDir
-	spec.Process.Args = configJSON.Config.Cmd
+	if configJSON.Config.WorkingDir != "" {
+		spec.Process.Cwd = configJSON.Config.WorkingDir
+	}
+
+	//spec.Process.Args = configJSON.Config.Cmd
 
 	//TODO: take user input or assin current user and group.
 	// NOTE: This will run the container with current user in container
@@ -208,6 +224,7 @@ func generateSpec(cmd *cobra.Command, args []string) {
 		}
 		uid, _ := strconv.Atoi(u.Uid)
 		gid, _ := strconv.Atoi(u.Gid)
+		//	fmt.Println(uid, gid)
 		spec.Process.User.UID = uint32(uid)
 		spec.Process.User.GID = uint32(gid)
 	}
@@ -218,11 +235,11 @@ func generateSpec(cmd *cobra.Command, args []string) {
 	//TODO: Capablities?
 	//TODO: Parse /dev/ram* (tmpfs) and setup devices in cgroup list
 	//TODO: Can we use the jessfraz/netns for setting up network?
-	jsonSpec, _ := json.MarshalIndent(spec, "", " ")
+	jsonSpec, _ := json.MarshalIndent(spec, "", "\t")
 	err = ioutil.WriteFile("config.json", jsonSpec, 0666)
-	if err!= nil {
+	if err != nil {
 		fmt.Println("Error while writing config file : ", err)
 	}
 }
 
-func sPtr(s string) *string      { return &s }
+func sPtr(s string) *string { return &s }
